@@ -1,0 +1,446 @@
+---
+title: "Pars Hospital Laboratory Test Data Visualization"
+author: "Saman Musician - HSE Professional at 'Bandab Consulting Engineers'"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r Libraries, include=FALSE}
+options(digits=2)
+if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
+if(!require(caret)) install.packages("caret", repos = "http://cran.us.r-project.org")
+if(!require(data.table)) install.packages("data.table", repos = "http://cran.us.r-project.org")
+if(!require(knitr)) install.packages("data.table", repos = "http://cran.us.r-project.org")
+if(!require(ggthemes)) install.packages("data.table", repos = "http://cran.us.r-project.org")
+if(!require(ggplot2)) install.packages("data.table", repos = "http://cran.us.r-project.org")
+if(!require(xlsx)) install.packages("data.table", repos = "http://cran.us.r-project.org")
+
+library(tidyverse)
+library(caret)
+library(data.table)
+library(knitr)
+library(ggthemes)
+library(ggplot2)
+library(xlsx)
+```
+
+```{r Reading Data, include=FALSE}
+data <- read.xlsx("Bandab1400.xlsx", sheetName = "Sheet1", header = TRUE)
+```
+
+```{r sum of employees, include=FALSE}
+sum <- length(as.array(unique(data$PatientID)))
+```
+
+
+```{r Information, include=FALSE}
+
+data_m <- data %>% group_by(PatientID) %>% filter(Sex == "M")
+data_f <- data %>% group_by(PatientID) %>% filter(Sex == "F")
+no_of_m <- length(unique(data_m$PatientID))
+no_of_f <- length(unique(data_f$PatientID))
+
+print("Average Age of all employees tested:")
+Ages <- data %>% group_by(PatientID) %>% .$Age
+mean_age <- mean(as.numeric(Ages))
+
+#Average Age of the men tested
+Ages <- data_m %>% group_by(PatientID) %>% .$Age
+mean_age_m <- mean(as.numeric(Ages))
+#Youngest man
+min_age_m <- min(Ages)
+#Oldest man
+max_age_m <- max(Ages)
+
+#Average Age of the women tested
+Ages <- data_f %>% group_by(PatientID) %>% .$Age
+mean_age_f <- mean(as.numeric(Ages))
+#Youngest woman
+min_age_f <- min(Ages)
+#Oldest woman
+max_age_f <- max(Ages)
+
+table1 <- data.frame(Sex = c("Male", "Female"),
+                        Number = c(no_of_m, no_of_f),
+                        Percentage = c(no_of_m/sum, no_of_f/sum)*100,
+                        AverageAge = c(mean_age_m, mean_age_f),
+                        minAge = c(min_age_m, min_age_f),
+                        maxAge = c(max_age_m, max_age_f))
+kable(table1, caption = "Employee's information Table")
+
+
+```
+
+
+## Introduction
+
+This report includes the Pars Hospital Laboratory test data visualization and primary data analysis for the main office staff at "Bandab Consulting Engineers" company. The test includes `r sum` people's information. The average age for all Bandab staff is currently **`r mean_age`** years old.\
+The summary of the personnel sex and age information is shown here:
+
+
+```{r Information Table, echo=FALSE}
+kable(table1, caption = "Staff Information")
+
+rm(Ages, max_age_f, max_age_m, mean_age_m, mean_age_f, min_age_m, min_age_f, no_of_m, no_of_f, sum, mean_age)
+```
+
+\pagebreak
+## Low Density Lipoprotein (LDL) Analysis
+
+LDL is also called as "Bad cholesterol" because a high LDL level leads to a buildup of cholesterol in the arteries.
+
+```{r LDL, echo=FALSE, warning=FALSE}
+#_______________________________________________________
+# LDL ANALYSIS
+#_______________________________________________________
+
+max_LDL <- data %>% group_by(PatientID) %>%
+  filter(Name == "LDL,Serum....................") %>%
+  summarize(LDL = as.numeric(Ans), ID = PatientID, Sex = Sex) %>% .$LDL %>% max()
+
+data %>% group_by(PatientID) %>%
+  filter(Name == "LDL,Serum....................") %>%
+  mutate(LDL = as.numeric(Ans), ID = PatientID, Sex = Sex) %>%
+  ggplot(aes(ID,LDL, col = Sex)) +
+  theme_base() +
+  geom_abline(slope = 0, intercept = 130, col = "red", size = 1) +
+  geom_abline(slope = 0, intercept = 57, col = "green" , size = 1) +
+  geom_point(size = 2) +
+  theme(axis.text.x = element_text(size = 8, angle = 90)) +
+  scale_y_continuous(breaks = c(57,130,max_LDL)) +
+  theme(axis.text.x=element_blank()) +
+  xlab("IDs") + ylab("LDL")
+
+
+rm(max_LDL)
+#Number of People with LDL higher than 130:
+high_LDL <- data %>% group_by(PatientID) %>% filter(Name == "LDL,Serum....................") %>%
+  mutate(Ans = as.numeric(Ans)) %>% filter(Ans>130) %>% .$PatientID %>% length()
+
+# Overall Average of LDL:
+mean_LDL <- data %>% group_by(PatientID) %>% filter(Name == "LDL,Serum....................") %>%
+  mutate(Ans = as.numeric(Ans)) %>% .$Ans %>% mean()
+
+```
+
+According to the analysis above, there are `r high_LDL` people having the LDL parameter higher than 130 which may be the result of the lack of activity and/or a fat diet.\
+It is also calculated that the average of LDL parameter for all the people tested is `r mean_LDL`.
+`r rm(high_LDL,mean_LDL)`
+
+\pagebreak
+## Triglyceride Analysis
+
+Triglycerides are fats from the food we eat that are carried in the blood. Most of the fats we eat, including butter, margarine, and oils, are in triglyceride form. Excess calories, alcohol or sugar in the body turn into triglycerides and are stored in fat cells throughout the body. Normal triglyceride levels in the blood are less than 150mg per deciliter (mg/dL). Borderline levels are between 150-200 mg/dL. High levels of triglycerides (greater than 200 mg/dl) are associated with an increased risk of atherosclerosis and therefore coronary artery disease and stroke.
+
+```{r Triglyceride, echo=FALSE}
+#_______________________________________________________
+# Triglyceride ANALYSIS
+#_______________________________________________________
+max_Tri <- data %>% group_by(PatientID) %>%
+  filter(Name == "Triglyceride,Serum...........") %>%
+  mutate(Ans = as.numeric(Ans)) %>%
+  summarize(Triglyceride = Ans, ID = PatientID, Sex = Sex) %>%
+  .$Triglyceride %>% max()
+
+
+data %>% group_by(PatientID) %>%
+  filter(Name == "Triglyceride,Serum...........") %>%
+  mutate(Ans = as.numeric(Ans)) %>%
+  summarize(Triglyceride = Ans, ID = PatientID, Sex = Sex) %>%
+  ggplot(aes(ID, Triglyceride, col = Sex)) +
+  theme_base() +
+  geom_abline(slope = 0, intercept = 150, col = "orange", size = 1) +
+  geom_abline(slope = 0, intercept = 200, col = "red", size = 1) +
+  geom_point(size = 2) +
+  theme(axis.text.x = element_text(size = 8, angle = 90)) +
+  scale_y_continuous(breaks = c(150,200,max_Tri)) +
+  theme(axis.text.x=element_blank()) +
+  xlab("IDs") + ylab("Triglyceride")
+
+
+rm(max_Tri)
+#Number of People with Triglyceride higher than 150:
+border_Tri <- data %>% group_by(PatientID) %>%
+  filter(Name == "Triglyceride,Serum...........") %>%
+  mutate(Ans = as.numeric(Ans)) %>%
+  select(PatientID,Name,Ans) %>%
+  filter(Ans>150) %>% .$PatientID %>% length()
+
+high_Tri <- data %>% group_by(PatientID) %>%
+  filter(Name == "Triglyceride,Serum...........") %>%
+  mutate(Ans = as.numeric(Ans)) %>%
+  select(PatientID,Name,Ans) %>%
+  filter(Ans>200) %>% .$PatientID %>% length()
+
+# overall average of Triglyceride:
+mean_Tri <- data %>% group_by(PatientID) %>% filter(Name == "Triglyceride,Serum...........") %>%
+  mutate(Ans = as.numeric(Ans)) %>% .$Ans %>% mean()
+
+```
+
+According to the analysis above, there are `r border_Tri` people having the Triglyceride parameter higher than 150 and `r high_Tri` people with Triglyceride parameter higher than 200.\
+It is also calculated that the average of Triglyceride parameter for all the people tested is `r mean_Tri`.
+`r rm(border_Tri, high_Tri, mean_Tri)`
+
+\pagebreak
+## Cholesterol
+
+Cholesterol is a waxy substance found in blood. The body needs cholesterol to build healthy cells, but high levels of cholesterol can increase the risk of heart disease.
+
+```{r Cholesterol, echo=FALSE}
+#_______________________________________________________
+# Cholesterol ANALYSIS
+#_______________________________________________________
+max_chol <- data %>% group_by(PatientID) %>%
+  filter(Name == "Cholesterol,Total,Serum.....") %>%
+  mutate(Ans = as.numeric(Ans)) %>%
+  summarize(Cholesterol = Ans, ID = PatientID, Sex = Sex) %>% .$Cholesterol %>% max()
+  
+
+data %>% group_by(PatientID) %>%
+  filter(Name == "Cholesterol,Total,Serum.....") %>%
+  mutate(Ans = as.numeric(Ans)) %>%
+  summarize(Cholesterol = Ans, ID = PatientID, Sex = Sex) %>%
+  ggplot(aes(ID, Cholesterol, col = Sex)) +
+  theme_base() +
+  geom_abline(slope = 0, intercept = 200, col = "orange", size = 1) +
+  geom_abline(slope = 0, intercept = 240, col = "red", size = 1) +
+  geom_point(size = 2) +
+  theme(axis.text.x = element_text(size = 8, angle = 90)) +
+  scale_y_continuous(breaks = c(200,240,max_chol)) +
+  theme(axis.text.x=element_blank()) +
+  xlab("IDs") + ylab("Cholesterol")
+
+rm(max_chol)
+#Number of People with Cholesterol higher than 200:
+high_chol <- data %>% group_by(PatientID) %>%
+  filter(Name == "Cholesterol,Total,Serum.....") %>%
+  mutate(Ans = as.numeric(Ans)) %>%
+  select(PatientID,Name,Ans) %>%
+  filter(Ans>200) %>% .$PatientID %>% length()
+
+# overall average of Cholesterol:
+mean_chol <- data %>% group_by(PatientID) %>% filter(Name == "Cholesterol,Total,Serum.....") %>%
+  mutate(Ans = as.numeric(Ans)) %>% .$Ans %>% mean()
+
+
+```
+
+According to the analysis above, there are `r high_chol` people having the Cholesterol parameter higher than 200.\
+It is also calculated that the average of Cholesterol parameter for all the people tested is `r mean_chol`.
+`r rm(high_chol, mean_chol)`
+
+\pagebreak
+## Fasting Blood Sugar (FBS) Analysis
+
+FBS is a test to determine how much glucose (sugar) is in a blood sample after an overnight fast. It is used as a test for diabetes. The expected values for normal fasting blood glucose concentration are between 65 mg/dL and 100 mg/dL.
+
+```{r FBS, echo=FALSE}
+#_______________________________________________________
+# Fasting Blood Sugar (FBS) ANALYSIS
+#_______________________________________________________
+max_fbs <- data %>% group_by(PatientID) %>%
+  filter(Name == "Fasting Blood Sugar...........") %>%
+  mutate(Ans = as.numeric(Ans)) %>%
+  summarize(FBS = Ans, ID = PatientID, Sex = Sex) %>% .$FBS %>% max()
+  
+  
+data %>% group_by(PatientID) %>%
+  filter(Name == "Fasting Blood Sugar...........") %>%
+  mutate(Ans = as.numeric(Ans)) %>%
+  summarize(FBS = Ans, ID = PatientID, Sex = Sex) %>%
+  ggplot(aes(ID, FBS, col = Sex)) +
+  theme_base() +
+  geom_abline(slope = 0, intercept = 65, col = "green", size = 1) +
+  geom_abline(slope = 0, intercept = 100, col = "red", size = 1) +
+  geom_point(size = 2) +
+  theme(axis.text.x = element_text(size = 8, angle = 90)) +
+  scale_y_continuous(breaks = c(65,100,max_fbs)) +
+  theme(axis.text.x=element_blank()) +
+  xlab("IDs") + ylab("Fasting Blood Sugar (FBS)")
+
+rm(max_fbs)
+#Number of People with FBS higher than 100:
+high_fbs <- data %>% group_by(PatientID) %>%
+  filter(Name == "Fasting Blood Sugar...........") %>%
+  mutate(Ans = as.numeric(Ans)) %>%
+  select(PatientID,Name,Ans) %>%
+  filter(Ans>100) %>% .$PatientID %>% length()
+
+# overall average of Cholesterol:
+mean_fbs <- data %>% group_by(PatientID) %>% filter(Name == "Fasting Blood Sugar...........") %>%
+  mutate(Ans = as.numeric(Ans)) %>% .$Ans %>% mean()
+
+```
+
+According to the analysis above, there are `r high_fbs` people having the FBS parameter higher than 100.\
+It is also calculated that the average of FBS parameter for all the people tested is `r mean_fbs`.
+`r rm(high_fbs, mean_fbs)`
+
+\pagebreak
+## SGPT Analysis
+
+SGPT exists predominantly in the liver and leaks into the bloodstream when produced in excess. The SGPT normal range is about 5 to 33(in women) and 41(in men) units per liter of blood serum. Thus, very high level of SGPT in the blood can be an indication of damage or problems related to the liver.
+
+```{r SGPT, echo=FALSE}
+#_______________________________________________________
+# Serum Glutamic Pyruvic Transaminase (SGPT)
+#_______________________________________________________
+max_sgpt <- data %>% group_by(PatientID) %>%
+  filter(Name == "SGPT (ALT),Serum.............") %>%
+  mutate(Ans = as.numeric(Ans)) %>%
+  summarize(SGPT = Ans, ID = PatientID, Sex = Sex) %>% .$SGPT %>% max()
+
+data %>% group_by(PatientID) %>%
+  filter(Name == "SGPT (ALT),Serum.............") %>%
+  mutate(Ans = as.numeric(Ans)) %>%
+  summarize(SGPT = Ans, ID = PatientID, Sex = Sex) %>%
+  ggplot(aes(ID, SGPT, col = Sex)) +
+  theme_base() +
+  geom_abline(slope = 0, intercept = 33, col = "red", size = 1) +
+  geom_abline(slope = 0, intercept = 41, col = "red", size = 1) +
+  geom_point(size = 2) +
+  theme(axis.text.x = element_text(size = 8, angle = 90)) +
+  scale_y_continuous(breaks = c(33,41,max_sgpt)) +
+  theme(axis.text.x=element_blank()) +
+  xlab("IDs") + ylab("SGPT (ALT)")
+
+rm(max_sgpt)
+#Number of Men with SGPT higher than 41:
+high_sgpt_m <- data %>% group_by(PatientID) %>%
+  filter(Sex == "M") %>%
+  filter(Name == "SGPT (ALT),Serum.............") %>%
+  mutate(Ans = as.numeric(Ans)) %>%
+  select(PatientID,Name,Ans) %>%
+  filter(Ans>41) %>% .$PatientID %>% length()
+
+#Number of Women with SGPT higher than 33:
+high_sgpt_f <- data %>% group_by(PatientID) %>%
+  filter(Sex == "F") %>%
+  filter(Name == "SGPT (ALT),Serum.............") %>%
+  mutate(Ans = as.numeric(Ans)) %>%
+  select(PatientID,Name,Ans) %>%
+  filter(Ans>33) %>% .$PatientID %>% length()
+
+# overall average of SGPT in men:
+mean_sgpt_m <- data %>% group_by(PatientID) %>% filter(Name == "SGPT (ALT),Serum.............") %>%
+  filter(Sex == "M") %>%
+  mutate(Ans = as.numeric(Ans)) %>% .$Ans %>% mean()
+
+# overall average of SGPT in women:
+mean_sgpt_f <- data %>% group_by(PatientID) %>% filter(Name == "SGPT (ALT),Serum.............") %>%
+  filter(Sex == "F") %>%
+  mutate(Ans = as.numeric(Ans)) %>% .$Ans %>% mean()
+
+
+```
+
+According to the analysis above, there are `r high_sgpt_m` men having the SGPT parameter higher than 41 and `r high_sgpt_f` women having the SGPT parameter higher than 33.\
+It is also calculated that the average of SGPT parameter for all men and women is accordingly `r mean_sgpt_m` and `r mean_sgpt_f`.
+`r rm(high_sgpt_m, high_sgpt_f, mean_sgpt_m, mean_sgpt_f)`
+
+\pagebreak
+## SGOT Anlaysis
+
+The SGOT test is a blood test that’s part of a liver profile. It measures one of two liver enzymes, called serum glutamic-oxaloacetic transaminase. This enzyme is now usually called AST, which stands for aspartate aminotransferase. The SGOT normal range is about 5 to 32(in women) and 40(in men) units per liter of blood serum.
+
+```{r SGOT, echo=FALSE}
+#_______________________________________________________
+# Serum Glutamic-Oxaloacetic Transaminase (SGOT)
+#_______________________________________________________
+max_sgot <- data %>% group_by(PatientID) %>%
+  filter(Name == "SGOT (AST),Serum.............") %>%
+  mutate(Ans = as.numeric(Ans)) %>%
+  summarize(SGOT = Ans, ID = PatientID, Sex = Sex) %>% .$SGOT %>% max()
+  
+
+data %>% group_by(PatientID) %>%
+  filter(Name == "SGOT (AST),Serum.............") %>%
+  mutate(Ans = as.numeric(Ans)) %>%
+  summarize(SGOT = Ans, ID = PatientID, Sex = Sex) %>%
+  ggplot(aes(ID, SGOT, col = Sex)) +
+  theme_base() +
+  geom_abline(slope = 0, intercept = 32, col = "red", size = 1) +
+  geom_abline(slope = 0, intercept = 40, col = "red", size = 1) +
+  geom_point(size = 2) +
+  theme(axis.text.x = element_text(size = 8, angle = 90)) +
+  scale_y_continuous(breaks = c(32,40, max_sgot)) +
+  theme(axis.text.x=element_blank()) +
+  xlab("IDs") + ylab("SGOT (AST)")
+
+rm(max_sgot)
+#Number of Men with SGOT higher than 40:
+high_sgot_m <- data %>% group_by(PatientID) %>%
+  filter(Sex == "M") %>%
+  filter(Name == "SGOT (AST),Serum.............") %>%
+  mutate(Ans = as.numeric(Ans)) %>%
+  select(PatientID,Name,Ans) %>%
+  filter(Ans>40) %>% .$PatientID %>% length()
+
+#Number of Women with SGOT higher than 32:
+high_sgot_f <- data %>% group_by(PatientID) %>%
+  filter(Sex == "F") %>%
+  filter(Name == "SGOT (AST),Serum.............") %>%
+  mutate(Ans = as.numeric(Ans)) %>%
+  select(PatientID,Name,Ans) %>%
+  filter(Ans>32) %>% .$PatientID %>% length()
+
+# overall average of SGOT in men:
+mean_sgot_m <- data %>% group_by(PatientID) %>% filter(Name == "SGOT (AST),Serum.............") %>%
+  filter(Sex == "M") %>%
+  mutate(Ans = as.numeric(Ans)) %>% .$Ans %>% mean()
+
+# overall average of SGOT in women:
+mean_sgot_f <- data %>% group_by(PatientID) %>% filter(Name == "SGOT (AST),Serum.............") %>%
+  filter(Sex == "F") %>%
+  mutate(Ans = as.numeric(Ans)) %>% .$Ans %>% mean()
+
+
+```
+
+According to the analysis above, there are `r high_sgot_m` men having the SGOT parameter higher than 41 and `r high_sgot_f` women having the SGOT parameter higher than 33.\
+It is also calculated that the average of SGOT parameter for all men and women is accordingly `r mean_sgot_m` and `r mean_sgot_f`.
+`r rm(high_sgot_m, high_sgot_f, mean_sgot_m, mean_sgot_f)`
+
+\pagebreak
+## Prostate Specific Antigen (PSA) Analysis
+
+The PSA test is a blood test used primarily to screen for prostate cancer. The PSA test can detect high levels of PSA that may indicate the presence of prostate cancer. However, many other conditions, such as an enlarged or inflamed prostate, also can increase PSA levels. Therefore, determining what a high PSA score means can be complicated. This test is done on all male employees with the age higher than 50 at "Bandab Consulting Engineers".
+
+```{r PSA, echo=FALSE}
+#_______________________________________________________
+# Prostate-Specific-Antigen (PSA)
+#_______________________________________________________
+max_psa <- data %>% group_by(PatientID) %>%
+  filter(Name == "PSA,Total (CLIA)..............") %>%
+  select(PatientID, Ans) %>%
+  mutate(Ans = as.numeric(Ans)) %>%
+  summarize(PSA = Ans , ID = PatientID) %>% .$PSA %>% max()
+
+
+data %>% group_by(PatientID) %>%
+  filter(Name == "PSA,Total (CLIA)..............") %>%
+  select(PatientID, Ans) %>%
+  mutate(Ans = as.numeric(Ans)) %>%
+  summarize(PSA = Ans , ID = PatientID) %>%
+  ggplot(aes(ID, PSA)) + theme_base() +
+  geom_abline(slope = 0, intercept = 3.1, col = "red", size = 1) +
+  geom_abline(slope = 0, intercept = 4.4, col = "red", size = 1) +
+  geom_point(size = 2) +
+  scale_y_continuous(breaks = c(3.1,4.4, max_psa)) +
+  theme(axis.text.x=element_blank())+
+  xlab("IDs") + ylab("Prostate Specific Antigen (PSA)")
+
+rm(max_psa)
+#Number of Men with PSA higher than 3.1:
+high_psa <- data %>% group_by(PatientID) %>%
+  filter(Sex == "M") %>%
+  filter(Name == "PSA,Total (CLIA)..............") %>%
+  mutate(Ans = as.numeric(Ans)) %>%
+  select(PatientID,Name,Ans) %>%
+  filter(Ans>3.1) %>% .$PatientID %>% length()
+```
+
+According to the analysis above, there are `r high_psa` men having the PSA parameter higher than 3.1 which indicates the necessity for further investigations.\
+`r rm(high_psa)`
+
